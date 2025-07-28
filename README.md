@@ -47,7 +47,7 @@ The application is built with Python and Streamlit and powered by a Random Fores
 **Installation**
 
 1. Clone the repository:
-   `git clone https://github.com/yourusername/cancer-risk-ai.git`
+   `git clone https://github.com/dimple-dhawan/cancer-risk-ai.git`
    `cd cancer-risk-ai`
 
 2. Install dependencies:
