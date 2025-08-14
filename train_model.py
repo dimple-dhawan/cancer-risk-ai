@@ -12,8 +12,11 @@ df = pd.read_csv("original_cancer_patient_data_sets.csv")
 # 2. Clean and encode categorical values
 df['Gender'] = df['Gender'].astype(str).str.strip().str.capitalize().map({'Male': 0, 'Female': 1})
 
-# Rename column to fix casing (optional cleanup)
+# Rename column to fix casing 
 df.rename(columns={"chronic Lung Disease": "Chronic Lung Disease"}, inplace=True)
+
+# Rename column to fix casing 
+df.rename(columns={"OccuPational Hazards": "Occupational Hazards"}, inplace=True)
 
 label_encoder = LabelEncoder()
 df['Level'] = label_encoder.fit_transform(df['Level'])

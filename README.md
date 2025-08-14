@@ -59,7 +59,7 @@ The application is built with Python and Streamlit and powered by a Random Fores
 Make sure `cancer_model.joblib` and `label_encoder.joblib` are present in the project directory.
 
 **Example Input**
-`65-year-old female, smoking heavily, fatigue: 6, balanced diet is very low`
+`50 year old, male, smoker, fatigue medium, passive smoker, coughing of blood, wheezing, obese`
 
 **Disclaimer**
 This tool is for educational and experimental purposes only. It is not intended to be used for medical diagnosis or treatment.
