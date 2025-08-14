@@ -1,126 +1,157 @@
 import pandas as pd
 import streamlit as st
-import openai
 from joblib import load
 import numpy as np
 import os
 from dotenv import load_dotenv
 from openai import OpenAI
+import json
 
 # --- Setup ---
-st.set_page_config(page_title="Cancer Prediction AI App", layout="centered")
-st.title("🧬 Cancer Prediction AI App")
+st.set_page_config(page_title="Cancer Prediction AI", layout="centered")
+st.title("🧬 Cancer Prediction AI")
 
-# --- Load Model, Encoder, and Data ---
+# --- Load Model and Data ---
 model = load("cancer_model.joblib")
 label_encoder = load("label_encoder.joblib")
 df = pd.read_csv("cleaned_cancer_data.csv")
 
-# Set your OpenAI API Key
+# --- OpenAI API Setup ---
 load_dotenv()
-# openai.api_key = os.getenv("OPENAI_API_KEY")
 api_key = os.getenv("OPENAI_API_KEY")
-print(f"API Key loaded? {'Yes' if api_key else 'No'}")
 client = OpenAI(api_key=api_key)
 
-# --- Define Function to Interact with OpenAI ---
-def ask_openai(user_query):
+# --- Column Mapping to match training data ---
+COLUMN_MAPPING = {col.lower(): col for col in model.feature_names_in_}
+
+# --- Encoding qualitative values to numeric codes (1-9 scale) ---
+ENCODING_MAP = {
+    "gender": {"male": 0, "female": 1},
+    "air pollution":            {"no": 1, "yes": 9, "low": 1, "medium": 5, "high": 9},
+    "alcohol use":              {"no": 1, "yes": 9, "low": 1, "medium": 5, "high": 9},
+    "dust allergy":             {"no": 1, "yes": 9, "low": 1, "medium": 5, "high": 9},
+    "occupational hazards":     {"no": 1, "yes": 9, "low": 1, "medium": 5, "high": 9},
+    "genetic risk":             {"low": 1, "medium": 5, "high": 9},
+    "chronic lung disease":     {"no": 1, "yes": 9, "low": 1, "medium": 5, "high": 9},
+    "balanced diet":            {"poor": 1, "average": 5, "good": 9, "no": 1, "yes": 9, "low": 1, "medium": 5, "high": 9},
+    "obesity":                  {"no": 1, "yes": 9, "low": 1, "medium": 5, "high": 9},
+    "smoking":                  {"no": 1, "yes": 9, "low": 1, "medium": 5, "high": 9},
+    "passive smoker":           {"no": 1, "yes": 9, "low": 1, "medium": 5, "high": 9},
+    "chest pain":               {"no": 1, "yes": 9, "low": 1, "medium": 5, "high": 9},
+    "coughing of blood":        {"no": 1, "yes": 9, "low": 1, "medium": 5, "high": 9},
+    "fatigue":                  {"no": 1, "yes": 9, "low": 1, "medium": 5, "high": 9},
+    "weight loss":              {"no": 1, "yes": 9, "low": 1, "medium": 5, "high": 9},
+    "shortness of breath":      {"no": 1, "yes": 9, "low": 1, "medium": 5, "high": 9},
+    "wheezing":                 {"no": 1, "yes": 9, "low": 1, "medium": 5, "high": 9},
+    "swallowing difficulty":    {"no": 1, "yes": 9, "low": 1, "medium": 5, "high": 9},
+    "clubbing of finger nails": {"no": 1, "yes": 9, "low": 1, "medium": 5, "high": 9},
+    "frequent cold":            {"no": 1, "yes": 9, "low": 1, "medium": 5, "high": 9},
+    "dry cough":                {"no": 1, "yes": 9, "low": 1, "medium": 5, "high": 9},
+    "snoring":                  {"no": 1, "yes": 9, "low": 1, "medium": 5, "high": 9},
+}
+
+# --- GPT Feature Extraction ---
+def ask_openai_uncached(user_query):
     prompt = f"""
-You are an AI analyst helping users query a cancer dataset. The dataset includes patient features like age, gender, smoking, obesity, etc.
+You are an assistant that extracts patient features from text for cancer risk prediction.
 
-Here are the columns in the dataset:
-{', '.join(df.columns)}
+Available features: {', '.join(df.columns)}
 
-The user may:
-1. Ask a question like "how many", "how much", "what is the average", etc. In that case, return Python pandas code that computes it using the DataFrame called df.
-    - Example: "How many smokers are in the dataset?"
-    - Your output should be Python code only, with a comment describing what it's doing.
+User may provide input like:
+- "70 year old obese smoker"
+- "Smoking: high, 70 year old, obese medium"
 
-2. Provide natural input asking for a risk prediction — for example:
-    - "What is the risk for a 30-year-old obese male smoker?"
-    - Or shorthand like: "30 year old, male, smoker, obese"
-    
-In that case:
-- Extract the necessary features into a cleaned dictionary using the appropriate column names.
-- Convert it to a DataFrame, run model.predict() to get the predicted risk level.
-- Return Python code that prints: "The risk level is [low/medium/high] based on the user's input."
+You must:
+1. Extract all relevant features from the text.
+2. Return ONLY a clean JSON object (dictionary) with keys in lowercase, like 'age', 'smoking', 'obesity', etc.
+3. Values can be numbers or qualitative descriptors like 'low', 'medium', 'high', 'yes', 'no'.
+4. Do not include any explanation, code, or extra text.
 
-Return only Python code in your response.
+If the text contains 'male' or 'female', set the key 'gender' accordingly.
+
+Example output:
+{{"age": 70, "smoking": "high", "obesity": "medium"}}
 """
     response = client.chat.completions.create(
         model="gpt-4",
-        messages=[{"role": "user", "content": prompt}],
+        messages=[
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": user_query}
+        ],
         temperature=0
     )
     return response.choices[0].message.content
 
-def fill_missing_features(input_dict, df):
-    filled = input_dict.copy()
-    for col in df.columns:
-        if col not in filled:
-            filled[col] = 1
-    return filled
+# Cached wrapper to avoid showing "Running ask_openai"
+@st.cache_data(show_spinner=False)
+def ask_openai(user_query):
+    return ask_openai_uncached(user_query)
 
-# --- Helper to Run Predictions ---
-def predict_from_input(input_dict):
+# --- Process input and map to model columns ---
+def process_input(user_input):
     try:
-        input_df = pd.DataFrame([input_dict])
-        prediction = model.predict(input_df)[0]  # numeric from 1 to 9
+        input_dict = json.loads(user_input)
+    except Exception:
+        return None
 
-        # Map numeric to risk category
-        if prediction <= 3:
-            risk_level = "low"
-        elif prediction <= 6:
-            risk_level = "medium"
+    # Encode qualitative features
+    encoded_dict = {}
+    for k, v in input_dict.items():
+        key_lower = k.lower()
+        if key_lower in ENCODING_MAP:
+            val_lower = str(v).lower()
+            encoded_dict[key_lower] = ENCODING_MAP[key_lower].get(val_lower, 1)
         else:
-            risk_level = "high"
+            try:
+                encoded_dict[key_lower] = float(v)
+            except:
+                encoded_dict[key_lower] = 1
+
+    # Map to model's expected columns
+    final_input = {}
+    for col_lower, col_name in COLUMN_MAPPING.items():
+        final_input[col_name] = encoded_dict.get(col_lower, 1)
+
+    # Create DataFrame with exact same order and names as model expects
+    return pd.DataFrame([final_input])[model.feature_names_in_]
+
+
+
+# --- Predict risk ---
+def predict_from_input(input_df):
+    try:
+        prediction = model.predict(input_df)[0]  # Directly use DataFrame with correct cols
+        risk_level = label_encoder.inverse_transform([prediction])[0]  # Low, Medium, High
 
         messages = {
-            "low": "Patient is at low risk. Continue monitoring and routine follow-up.",
-            "medium": "Patient shows moderate risk. Consider checking for early signs of non-adherence.",
-            "high": "Patient is at high risk. Immediate intervention may be needed to prevent complications."
+            "Low": "Patient is at low risk. Continue monitoring and routine follow-up.",
+            "Medium": "Patient shows moderate risk. Consider checking for early signs of non-adherence.",
+            "High": "Patient is at high risk. Immediate intervention may be needed to prevent complications."
         }
 
-        message = messages.get(risk_level, "Risk level unknown.")
-
-        return f"Predicted Cancer Risk Level: **{risk_level.capitalize()}**\n\n{message}"
+        return f"Predicted Cancer Risk Level: **{risk_level.capitalize()}**\n\n{messages[risk_level]}"
     except Exception as e:
         return f"Error during prediction: {e}"
 
-st.text("Features include:  Age, Gender, Air Pollution, Alcohol use, Dust Allergy, OccuPational Hazards, Genetic Risk, Chronic Lung Disease, Balanced Diet, Obesity, Smoking, Passive Smoker, Chest Pain, Coughing of Blood, Fatigue, Weight Loss, Shortness of Breath, Wheezing, Swallowing Difficulty, Clubbing of Finger Nails, Frequent Cold, Dry Cough, Snoring")
 
-# --- User Input ---
-user_question = st.text_area("Ask me a question about the cancer data or a patient case:", height=100)
+# --- Streamlit Interface ---
+st.text("Features include: \nAge, Gender, Air Pollution, Alcohol use, Dust Allergy, OccuPational Hazards, Genetic Risk, Chronic Lung Disease, Balanced Diet, Obesity, Smoking, Passive Smoker, Chest Pain, Coughing of Blood, Fatigue, Weight Loss, Shortness of Breath, Wheezing, Swallowing Difficulty, Clubbing of Finger Nails, Frequent Cold, Dry Cough, Snoring")
+st.text("Enter patient information: ")
+user_question = st.text_area(
+    """If a feature is at a high risk, type the feature name alone.
+For other levels, specify the value low, or medium.  \n
+ie: '50 year old, male, smoker, fatigue medium'.""",
+    height=100
+)
 
 if st.button("Submit") and user_question:
     with st.spinner("Analyzing..."):
-        response = ask_openai(user_question)
+        extracted_json = ask_openai(user_question)
+        input_df = process_input(extracted_json)
 
-    st.markdown("### 🤖 OpenAI Response")
-    st.code(response)
+    if input_df is not None:
+        result = predict_from_input(input_df)  # Pass DataFrame directly
+        st.success(result)
+    else:
+        st.error("Could not process input. Please check your text format.")
 
-    # Try to parse and execute result
-    try:
-        if "predict" in response.lower() or "model" in response.lower():
-            # Attempt to extract dictionary
-            exec_globals = {}
-            exec(response, {"np": np}, exec_globals)
-            input_dict = exec_globals.get("input_dict")
-            if input_dict:
-                input_dict_filled = fill_missing_features(input_dict, df)
-                result = predict_from_input(input_dict_filled)
-                st.success(result)
-            else:
-                st.error("No input_dict found in response.")
-        elif "df" in response:
-            exec_globals = {"df": df.copy()}
-            exec(response, exec_globals)
-            result = exec_globals.get("result")
-            if result is not None:
-                st.dataframe(result)
-            else:
-                st.warning("No 'result' variable in code. Showing output of execution.")
-        else:
-            st.warning("Unrecognized format. Manual response:\n" + response)
-    except Exception as e:
-        st.error(f"Error executing OpenAI response:\n{e}")
