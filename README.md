@@ -64,4 +64,19 @@ Make sure `cancer_model.joblib` and `label_encoder.joblib` are present in the pr
 **Disclaimer**
 This tool is for educational and experimental purposes only. It is not intended to be used for medical diagnosis or treatment.
 
+## Screenshots
 
+<h3>Landing Page</h3>
+<img src="images/1_Landing_page.png" alt="Landing Page" width="500">
+
+<h3>Analyzing Request Upon Submit</h3>
+<img src="images/2_Analyzing_Request.png" alt="Analyzing Request" width="500">
+
+<h3>Prediction Result</h3>
+<img src="images/3_Result.png" alt="Prediction Result" width="500">
+
+
+
+## Feature Importance
+
+<img src="images/feature_importance.png" alt="Feature Importance" width="500">
