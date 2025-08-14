@@ -124,9 +124,9 @@ def predict_from_input(input_df):
         risk_level = label_encoder.inverse_transform([prediction])[0]  # Low, Medium, High
 
         messages = {
-            "Low": "Patient is at low risk. Continue monitoring and routine follow-up.",
-            "Medium": "Patient shows moderate risk. Consider checking for early signs of non-adherence.",
-            "High": "Patient is at high risk. Immediate intervention may be needed to prevent complications."
+            "Low": "Risk appears low. Continue standard monitoring and apply clinical judgment for patient management.",
+            "Medium": "Risk appears moderate. Consider additional evaluation or monitoring as appropriate, using clinical judgment.",
+            "High": "Risk appears high. Review patient history and clinical indicators; use results to support professional decision-making."
         }
 
         return f"Predicted Cancer Risk Level: **{risk_level.capitalize()}**\n\n{messages[risk_level]}"
@@ -155,3 +155,8 @@ if st.button("Submit") and user_question:
     else:
         st.error("Could not process input. Please check your text format.")
 
+# Disclaimer below submit and result
+st.markdown(
+    "**Disclaimer:** This tool is for educational and experimental purposes only. "
+    "It is not intended to be used for medical diagnosis or treatment."
+)
