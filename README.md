@@ -17,6 +17,9 @@ The application is built with Python and Streamlit and powered by a Random Fores
   "70-year-old male who smokes and has chest pain"
   or
   "Smoking: 7, Passive Smoker is high"
+  or 
+  questions about the dataset itself like: 
+  "How many men under 30 are high risk of cancer and high obesity?"
 * Supports both descriptive and numeric symptom entries
 * Real-time predictions with health insights
 * Interactive web interface built with Streamlit
